@@ -9,26 +9,37 @@ extern crate plist;
 use auto_launch::AutoLaunchBuilder;
 use calculator::calculate;
 use directories::ProjectDirs;
+use tauri::State;
 use std::{process::Command, time::Instant};
 
 pub use icons::convert_all_app_icons_to_png;
 pub use preferences::create_preferences_if_missing;
 pub use search::{search, similarity_sort};
 
+use crate::app::AppState;
+
+#[derive(Debug, serde::Serialize)]
 pub enum ResultType {
     Applications = 1,
     Files = 2,
     Calculation = 3,
+    Extensions = 4,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct InputResult {
+    pub r#type: ResultType,
+    pub title: Option<String>,
+    pub value: String,
 }
 
 #[tauri::command]
-pub async fn handle_input(input: String) -> (Vec<String>, f32, i32) {
-    let mut result: Vec<String>;
-    let mut result_type: ResultType;
+pub fn handle_input(input: &str, state: State<'_, AppState>) -> (Vec<InputResult>, f32) {
+    let mut result: Vec<InputResult>;
     let start_time = Instant::now();
-    if !input.starts_with("/") {
-        result = search(
-            input.as_str(),
+    if !input.starts_with('/') {
+        let mut apps_result = search(
+            input,
             vec![
                 "/Applications",
                 "/System/Applications",
@@ -37,27 +48,60 @@ pub async fn handle_input(input: String) -> (Vec<String>, f32, i32) {
             Some(".app"),
             Some(1),
         );
-        similarity_sort(&mut result, input.as_str());
-        result_type = ResultType::Applications;
+        similarity_sort(&mut apps_result, input);
+        let mut apps_result: Vec<InputResult> = apps_result
+            .iter()
+            .map(|it| InputResult {
+                r#type: ResultType::Applications,
+                title: None,
+                value: it.to_string(),
+            })
+            .collect();
+        let state = state.0.lock().unwrap();
+        let mut exts_result: Vec<InputResult> = state
+            .extensions
+            .iter()
+            .filter(|it| {
+                it.title.contains(input)
+            })
+            .map(|it| InputResult {
+                r#type: ResultType::Extensions,
+                title: Some(it.title.clone()),
+                value: it.main.clone(),
+            })
+            .collect();
+        result = Vec::new();
+        result.append(&mut apps_result);
+        result.append(&mut exts_result);
     } else {
         result = search(
-            input.trim_start_matches("/"),
+            input.trim_start_matches('/'),
             vec!["/Users/"],
             None,
             Some(10000),
-        );
-        println!("{:?}", result);
-        result_type = ResultType::Files;
+        )
+            .iter()
+            .map(|it| {
+                InputResult {
+                    r#type: ResultType::Files,
+                title: None,
+                    value: it.to_string(),
+                }
+            })
+            .collect();
     }
-    if result.len() == 0 {
-        let calculation_result = calculate(input.as_str());
-        if calculation_result != "" {
-            result.push(calculation_result);
-            result_type = ResultType::Calculation;
+    if result.is_empty() {
+        let calculation_result = calculate(input);
+        if !calculation_result.is_empty() {
+            result.push(InputResult {
+                r#type: ResultType::Calculation,
+                title: None,
+                value: calculation_result,
+            });
         }
     }
     let time_taken = start_time.elapsed().as_secs_f32();
-    return (result, time_taken, result_type as i32);
+    (result, time_taken)
 }
 
 #[tauri::command]

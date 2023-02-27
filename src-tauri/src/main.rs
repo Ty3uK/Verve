@@ -1,7 +1,10 @@
 #![warn(clippy::nursery, clippy::pedantic)]
 
 mod util;
+mod extensions;
+mod app;
 
+use app::{AppState};
 use tauri::{
     CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
 };
@@ -32,6 +35,7 @@ fn main() {
     convert_all_app_icons_to_png();
     create_preferences_if_missing();
     tauri::Builder::default()
+        .manage(AppState::new())
         .invoke_handler(tauri::generate_handler![
             open_command,
             get_icon,

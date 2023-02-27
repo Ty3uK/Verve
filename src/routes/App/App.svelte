@@ -5,15 +5,18 @@
   import SearchResult from './lib/SearchResult.svelte';
   import Settings from '../Settings/Settings.svelte';
   import { invoke } from '@tauri-apps/api/tauri';
+  import type { InputResult } from '../../utils/result';
+  import type { ComponentType } from 'svelte';
 
   export let appState = {
     app: true,
     settings: false,
   };
-  let results: string[] = [];
+  let results: InputResult[] = [];
   let executionTime: number = 0;
   let resultType: number = 0;
   let footerText: string = 'verve.app';
+  let Component: ComponentType | null = null;
 
   document.onkeyup = function (event) {
     if (event.metaKey && event.key === ',') {
@@ -30,7 +33,7 @@
 
   const search = async (searchPrompt: string) => {
     footerText = 'Loading...';
-    [results, executionTime, resultType] = await invoke('handle_input', {
+    [results, executionTime] = await invoke('handle_input', {
       input: searchPrompt,
     });
     if (results.length === 0) {
@@ -66,6 +69,22 @@
     }
     search(event.target.value);
   };
+
+  function onExtension(component: ComponentType) {
+    Component = component;
+  }
+
+  function renderExtension(node) { 
+    const component = new Component({
+      target: node,
+    });
+
+    return {
+      destroy() {
+        component.$destroy();
+      },
+    };
+  }
 </script>
 
 <svelte:window on:blur={onBlur} />
@@ -75,7 +94,11 @@
     <!-- svelte-ignore empty-block -->
     {#await appWindow.setSize(new LogicalSize(750, 100))}{/await}
     <SearchBar on:input={handleInput} />
-    <SearchResult bind:results {resultType} />
+    {#if Component === null}
+      <SearchResult bind:results onExtension={onExtension} />
+    {:else}
+      <div use:renderExtension />
+    {/if}
     <Footer {footerText} />
   {/if}
   {#if appState.settings}

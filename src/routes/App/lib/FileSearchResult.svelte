@@ -1,33 +1,45 @@
 <script lang="ts">
   import { getFileName, getTruncatedFilePath } from '../../../utils/path';
   import { getIcon } from '../../../utils/icon';
-  export let filePath;
-  export let resultType: number;
+  import { ResultType, type InputResult } from '../../../utils/result';
+  import { afterUpdate } from 'svelte';
+  export let filePath: InputResult;
+
+  $: title = filePath.type === ResultType.Extensions
+      ? filePath.title ?? ''
+      : getFileName(filePath.value).replace(/.app$/, '');
 </script>
 
-<button on:click class="searchResult" id={filePath}>
+<button on:click class="searchResult" id={filePath.value}>
   <div class="resultContent">
-    {#await getIcon(getFileName(filePath).replace(/.app$/, ''))}
-      <span class="icon" />
-    {:then { icon, fallbackIcon }}
+    {#if filePath.type === ResultType.Extensions}
       <img
         class="icon"
-        src={icon}
         alt=""
-        on:error={event => {
-          // @ts-ignore
-          event.target.src = fallbackIcon;
-        }}
       />
-    {/await}
+    {:else}
+      {#await getIcon(getFileName(filePath.value).replace(/.app$/, ''))}
+        <span class="icon" />
+      {:then { icon, fallbackIcon }}
+        <img
+          class="icon"
+          src={icon}
+          alt=""
+          on:error={event => {
+            // @ts-ignore
+            event.target.src = fallbackIcon;
+          }}
+        />
+      {/await}
+    {/if}
     <p class="fileName">
-      {getFileName(filePath).replace(/.app$/, '')}
+      {title}
     </p>
   </div>
-  {#if resultType == 2}
+  {#if filePath.type == ResultType.Files}
     <div class="resultPathDiv">
       <p class="resultPathText">
-        {getTruncatedFilePath(filePath)}
+        {getTruncatedFilePath(filePath.value)}
       </p>
     </div>
   {/if}

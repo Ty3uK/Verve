@@ -1,9 +1,10 @@
 <script lang="ts">
-  export let results: string[];
+  export let results: InputResult[];
   import { appWindow } from '@tauri-apps/api/window';
+  import type { InputResult } from '../../../utils/result';
 
   const copyAnswer = async () => {
-    await navigator.clipboard.writeText(results[0]);
+    await navigator.clipboard.writeText(results[0].value);
   };
 
   const searchResultClicked = async (event: any) => {
@@ -21,7 +22,7 @@
 <div class="result">
   <button
     class="calculation-button"
-    id={results[0]}
+    id={results[0].value}
     on:keydown={searchResultClicked}
   >
     <p>{results[0]}</p>
